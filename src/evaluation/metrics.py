@@ -34,7 +34,7 @@ def evaluate_regression(y_true: pd.Series, y_pred: pd.Series) -> Dict[str, float
     }
 
 
-def evaluate_classification(y_true: pd.Series, y_pred: pd.Series, threshold: float = 0.0) -> Dict[str, float]:
+def evaluate_classification(y_true: pd.Series, y_pred: pd.Series, threshold: float = 1.0) -> Dict[str, float]:
     """
     Evalúa como clasificación binaria (¿lloverá o no?).
     
