@@ -24,6 +24,11 @@ class BasePredictor(ABC):
     def predict(self, steps: int) -> pd.Series:
         """Hacer predicciones"""
         pass
+
+    @abstractmethod
+    def get_params(self) -> Dict[str, Any]:
+        """Retornar hiperparámetros del modelo"""
+        pass
     
     def evaluate(self, y_true: pd.Series, y_pred: pd.Series) -> Dict[str, float]:
         """Evaluar modelo"""
@@ -51,6 +56,8 @@ class BasePredictor(ABC):
         n_splits: int = 5,
         test_size: int = 30,
         log_mlflow: bool = True,
+        run_description: str = None,
+        train_final_model: bool = True,
         **fit_kwargs
     ) -> pd.DataFrame:
         """
@@ -61,6 +68,8 @@ class BasePredictor(ABC):
             n_splits: Número de folds
             test_size: Días en cada test set
             log_mlflow: Si registrar en MLflow
+            run_description: Descripción del experimento (opcional)
+            train_final_model: Si entrenar modelo final con todos los datos
             **fit_kwargs: Parámetros adicionales para fit()
             
         Returns:
@@ -78,9 +87,21 @@ class BasePredictor(ABC):
         
         if log_mlflow:
             with mlflow.start_run(run_name=parent_run_name):
+                mlflow.set_tag("run_type", "parent")  # Para excluir folds individuales
+                mlflow.set_tag("model_family", self.model_name.split('(')[0])  # ARIMA, Prophet, LightGBM
+                mlflow.set_tag("evaluation_type", "cross_validation")
+                mlflow.set_tag("run_stage", "experimentation")
+                
+                if run_description:
+                    mlflow.set_tag("description", run_description)
+                
                 mlflow.log_param("cv_strategy", "TimeSeriesSplit")
                 mlflow.log_param("n_splits", n_splits)
                 mlflow.log_param("test_size", test_size)
+
+                model_params = self.get_params()
+                for param_name, param_value in model_params.items():
+                    mlflow.log_param(param_name, param_value)
                 
                 for fold_idx, (train, test) in enumerate(folds):
                     metrics = self._run_single_fold(fold_idx, train, test, log_mlflow=True, **fit_kwargs)
@@ -92,6 +113,23 @@ class BasePredictor(ABC):
                 
                 for metric_name, metric_value in avg_metrics.items():
                     mlflow.log_metric(f"cv_avg_{metric_name}", metric_value)
+
+
+                if train_final_model:
+                    print(f"\n{'='*60}")
+                    print(f"ENTRENANDO MODELO FINAL CON DATASET COMPLETO")
+                    print(f"{'='*60}")
+                    print(f"🚀 Entrenando {self.model_name} con {len(data)} días...")
+                    
+                    self.fit(data, **fit_kwargs)
+                    
+                    # Guardar modelo final
+                    mlflow.sklearn.log_model(self.model, "model")
+                    mlflow.log_param("trained_on", "full_dataset")
+                    mlflow.log_param("n_samples_full", len(data))
+                    
+                    print(f"✅ Modelo final guardado en MLflow")
+
         else:
             for fold_idx, (train, test) in enumerate(folds):
                 metrics = self._run_single_fold(fold_idx, train, test, log_mlflow=False, **fit_kwargs)
@@ -120,6 +158,8 @@ class BasePredictor(ABC):
         
         if log_mlflow:
             with mlflow.start_run(run_name=f"fold_{fold_idx+1}", nested=True):
+                mlflow.set_tag("run_type", "fold")
+                mlflow.set_tag("fold_number", fold_idx + 1)
                 return self._train_eval_pipeline(train, test, fold_idx=fold_idx, **fit_kwargs)
         else:
             return self._train_eval_pipeline(train, test, fold_idx=fold_idx, **fit_kwargs)
