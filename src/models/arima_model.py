@@ -4,6 +4,7 @@ import pandas as pd
 from statsmodels.tsa.arima.model import ARIMA
 import mlflow
 from src.models.base_model import BasePredictor
+from typing import Dict, Any, List, Tuple
 
 
 class ARIMAPredictor(BasePredictor):
@@ -36,3 +37,11 @@ class ARIMAPredictor(BasePredictor):
         
         predictions = self.model.forecast(steps=steps)
         return pd.Series(predictions)
+    
+    def get_params(self) -> Dict[str, Any]:
+        """Retornar hiperparámetros del modelo"""
+        return {
+            'p': self.p,
+            'd': self.d,
+            'q': self.q
+        }

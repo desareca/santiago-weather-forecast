@@ -4,7 +4,7 @@ import pandas as pd
 from prophet import Prophet
 import mlflow
 from src.models.base_model import BasePredictor
-
+from typing import Dict, Any, List, Tuple
 
 class ProphetPredictor(BasePredictor):
     """Predictor usando Prophet de Meta"""
@@ -14,13 +14,15 @@ class ProphetPredictor(BasePredictor):
         yearly_seasonality: bool = True,
         weekly_seasonality: bool = False,
         daily_seasonality: bool = False,
-        changepoint_prior_scale: float = 0.05
+        changepoint_prior_scale: float = 0.05,
+        seasonality_prior_scale: float = 10.0
     ):
         super().__init__(model_name="Prophet")
         self.yearly_seasonality = yearly_seasonality
         self.weekly_seasonality = weekly_seasonality
         self.daily_seasonality = daily_seasonality
         self.changepoint_prior_scale = changepoint_prior_scale
+        self.seasonality_prior_scale = seasonality_prior_scale
         
     def fit(self, train: pd.Series, **kwargs):
         """Entrenar Prophet"""
@@ -36,7 +38,8 @@ class ProphetPredictor(BasePredictor):
             yearly_seasonality=self.yearly_seasonality,
             weekly_seasonality=self.weekly_seasonality,
             daily_seasonality=self.daily_seasonality,
-            changepoint_prior_scale=self.changepoint_prior_scale
+            changepoint_prior_scale=self.changepoint_prior_scale,
+            seasonality_prior_scale=self.seasonality_prior_scale
         )
         
         # Entrenar (silenciar warnings)
@@ -49,6 +52,7 @@ class ProphetPredictor(BasePredictor):
             mlflow.log_param("yearly_seasonality", self.yearly_seasonality)
             mlflow.log_param("weekly_seasonality", self.weekly_seasonality)
             mlflow.log_param("changepoint_prior_scale", self.changepoint_prior_scale)
+            mlflow.log_param("seasonality_prior_scale", self.seasonality_prior_scale)
         
         print(f"✅ Prophet entrenado")
         
@@ -70,3 +74,13 @@ class ProphetPredictor(BasePredictor):
         predictions = predictions.clip(lower=0)
         
         return pd.Series(predictions.values)
+    
+    def get_params(self) -> Dict[str, Any]:
+        """Retornar hiperparámetros del modelo"""
+        return {
+            'yearly_seasonality': self.yearly_seasonality,
+            'weekly_seasonality': self.weekly_seasonality,
+            'daily_seasonality': self.daily_seasonality,
+            'changepoint_prior_scale': self.changepoint_prior_scale,
+            'seasonality_prior_scale': self.seasonality_prior_scale
+        }
