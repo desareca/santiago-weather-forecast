@@ -48,7 +48,7 @@ def train_test_split_temporal(
 
 def create_lag_features(df: pd.DataFrame, target_col: str = "precipitacion", lags: list = [1, 7, 30]) -> pd.DataFrame:
     """
-    Crea features de lag para LightGBM.
+    Crea features de lag y temporales para LightGBM incluyendo codificación cíclica.
     
     Args:
         df: DataFrame con datos
@@ -56,7 +56,7 @@ def create_lag_features(df: pd.DataFrame, target_col: str = "precipitacion", lag
         lags: Lista de lags a crear
         
     Returns:
-        DataFrame con features de lag
+        DataFrame con features de lag y temporales
     """
     df = df.copy()
     
@@ -68,15 +68,21 @@ def create_lag_features(df: pd.DataFrame, target_col: str = "precipitacion", lag
     df[f'{target_col}_rolling_mean_30'] = df[target_col].shift(1).rolling(30).mean()
     
     # Features temporales
-    df['mes'] = df.index.month
-    df['dia_año'] = df.index.dayofyear
+    #df['mes'] = df.index.month
+    #df['dia_año'] = df.index.dayofyear
     df['estacion'] = df['mes'].apply(lambda x: 
         'verano' if x in [12, 1, 2] else
         'otoño' if x in [3, 4, 5] else
         'invierno' if x in [6, 7, 8] else 'primavera'
     )
     
-    # Eliminar filas con NaN (por los lags)
+    # Codificación cíclica
+    df['mes_sin'] = np.sin(2 * np.pi * df.index.month / 12)
+    df['mes_cos'] = np.cos(2 * np.pi * df.index.month / 12)
+    df['dia_año_sin'] = np.sin(2 * np.pi * df.index.dayofyear / 365)
+    df['dia_año_cos'] = np.cos(2 * np.pi * df.index.dayofyear / 365)
+    
+    # Eliminar filas con NaN (por los lags y windows)
     df = df.dropna()
     
     print(f"✅ Features creadas. Shape final: {df.shape}")
