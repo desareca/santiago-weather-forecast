@@ -55,6 +55,7 @@ class BasePredictor(ABC):
         data: pd.Series,
         n_splits: int = 5,
         test_size: int = 30,
+        min_train_size: int = 180,
         log_mlflow: bool = True,
         run_description: str = None,
         train_final_model: bool = True,
@@ -77,7 +78,7 @@ class BasePredictor(ABC):
         """
         from src.evaluation.cross_validation import TimeSeriesSplit
         
-        cv = TimeSeriesSplit(n_splits=n_splits, test_size=test_size)
+        cv = TimeSeriesSplit(n_splits=n_splits, test_size=test_size, min_train_size=min_train_size)
         folds = cv.split(data)
         
         results = []
@@ -182,8 +183,13 @@ class BasePredictor(ABC):
         
         # Predecir
         print(f"🔮 Generando predicciones...")
-        predictions = self.predict(steps=len(test))
-        predictions.index = test.index
+        preds = []
+        for i, test_date in enumerate(test.index):
+            # Histórico real hasta justo antes del test_date
+            hist = pd.concat([train, test[:test_date]])[:-1]
+            pred = self.predict(steps=1, history=hist, autoregressive=False)
+            preds.append(pred.values[0])
+        predictions = pd.Series(preds, index=test.index)
         
         # Evaluar
         metrics = self.evaluate(test, predictions)
