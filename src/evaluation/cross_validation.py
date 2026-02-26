@@ -13,14 +13,16 @@ class TimeSeriesSplit:
     Preserva orden cronológico, sin leakage de futuro.
     """
     
-    def __init__(self, n_splits: int = 5, test_size: int = 30):
+    def __init__(self, n_splits: int = 5, test_size: int = 30, min_train_size: int = 200):
         """
         Args:
             n_splits: Número de folds
             test_size: Días en cada test set
+            min_train_size: Mínimo para entrenar
         """
         self.n_splits = n_splits
         self.test_size = test_size
+        self.min_train_size = min_train_size
     
     def split(self, data: pd.Series) -> List[Tuple[pd.Series, pd.Series]]:
         """
@@ -30,32 +32,39 @@ class TimeSeriesSplit:
             Lista de tuplas (train, test)
         """
         total_size = len(data)
-        min_train_size = 100  # Mínimo para entrenar
-        
-        # Calcular tamaño de cada incremento
-        max_train_size = total_size - (self.n_splits * self.test_size)
-        step_size = (max_train_size - min_train_size) // (self.n_splits - 1)
-        
+        min_train_size = self.min_train_size
+        n_splits = self.n_splits
+        test_size = self.test_size
         folds = []
-        
-        for i in range(self.n_splits):
-            # Train crece progresivamente
-            train_end = min_train_size + (i * step_size)
+        # El último test termina al final
+        last_test_end = total_size
+        # El primer train puede ser más largo
+        first_train_end = total_size - test_size
+        # Calcular el incremento equidistante
+        if n_splits > 1:
+            step = (first_train_end - min_train_size) // (n_splits - 1)
+        else:
+            step = 0
+        for i in range(n_splits):
+            train_end = min_train_size + i * step
             test_start = train_end
-            test_end = test_start + self.test_size
-            
+            test_end = test_start + test_size
             if test_end > total_size:
                 break
-                
             train = data[:train_end]
             test = data[test_start:test_end]
-            
             folds.append((train, test))
-        
+        # Ajustar el último fold para que use todo el dataset
+        if len(folds) > 0:
+            last_train_end = total_size - test_size
+            last_test_start = last_train_end
+            last_test_end = total_size
+            train = data[:last_train_end]
+            test = data[last_test_start:last_test_end]
+            folds[-1] = (train, test)
         print(f"\n📊 {len(folds)} folds creados:")
         for i, (train, test) in enumerate(folds):
             print(f"  Fold {i+1}: Train={len(train)} días, Test={len(test)} días")
-        
         return folds
     
     def visualize_splits(self, data: pd.Series):
