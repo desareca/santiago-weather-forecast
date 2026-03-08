@@ -45,15 +45,10 @@ def fetch_weather_data(
     
     data = response.json()
     
-    # Construir DataFrame
-    df = pd.DataFrame({
-        "fecha": pd.to_datetime(data["daily"]["time"]),
-        "precipitacion": data["daily"]["precipitation_sum"],
-        "temp_max": data["daily"]["temperature_2m_max"],
-        "temp_min": data["daily"]["temperature_2m_min"],
-        "viento_max": data["daily"]["windspeed_10m_max"],
-        "weather_code": data["daily"]["weathercode"]
-    })
+    df = pd.DataFrame(data["daily"])
+    df = df.rename(columns={"time": "fecha"})
+    df["fecha"] = pd.to_datetime(df["fecha"])
+
     
     print(f"✅ Descargados {len(df)} registros")
     return df
@@ -69,7 +64,7 @@ def save_to_delta_table(df: pd.DataFrame, table_name: str, spark) -> None:
         spark: Spark session
     """
     spark_df = spark.createDataFrame(df)
-    spark_df.write.format("delta").mode("overwrite").saveAsTable(table_name)
+    spark_df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(table_name)
     print(f"✅ Guardado en tabla Delta: {table_name}")
 
 
