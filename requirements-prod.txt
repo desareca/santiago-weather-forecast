@@ -8,13 +8,13 @@ lightgbm==4.1.0
 joblib==1.3.2
 
 # ── API ─────────────────────────────────────────────────────────────
-# fastapi 0.100.1 usa starlette 0.27.x — compatible con prefect 2.14.10
 fastapi==0.100.1
 uvicorn==0.27.0
 pydantic==2.5.3
 
 # ── Orquestación ────────────────────────────────────────────────────
 prefect==2.14.10
+griffe==0.38.1  # prefect 2.14.10 requiere griffe<1.0 — griffe 2.x eliminó dataclasses
 
 # ── Storage del modelo ──────────────────────────────────────────────
 huggingface_hub==0.20.3
