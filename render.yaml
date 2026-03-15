@@ -1,5 +1,5 @@
 services:
-
+ 
   # ── Web Service — FastAPI ─────────────────────────────────────────
   - type: web
     name: santiago-weather-api
@@ -18,41 +18,4 @@ services:
       - key: PYTHONPATH
         value: /app
     healthCheckPath: /health
-
-  # ── Cron Job — Daily Flow (08:00 Santiago = 11:00 UTC) ───────────
-  - type: cron
-    name: santiago-weather-daily
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    schedule: "0 11 * * *"
-    envVars:
-      - key: HF_REPO_ID
-        sync: false
-      - key: HF_TOKEN
-        sync: false
-      - key: DB_PATH
-        value: /tmp/santiago_weather.db
-      - key: MODEL_CACHE_DIR
-        value: /tmp/model_cache
-      - key: PYTHONPATH
-        value: /app
-    dockerCommand: python -c "from src.flows.daily_flow import daily_flow; import json; print(json.dumps(daily_flow()))"
-
-  # ── Cron Job — Monthly Flow (día 1 de cada mes, 06:00 Santiago) ──
-  - type: cron
-    name: santiago-weather-monthly
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    schedule: "0 9 1 * *"
-    envVars:
-      - key: HF_REPO_ID
-        sync: false
-      - key: HF_TOKEN
-        sync: false
-      - key: DB_PATH
-        value: /tmp/santiago_weather.db
-      - key: MODEL_CACHE_DIR
-        value: /tmp/model_cache
-      - key: PYTHONPATH
-        value: /app
-    dockerCommand: python -c "from src.flows.monthly_flow import monthly_flow; import json; print(json.dumps(monthly_flow(), default=str))"
+ 

@@ -1,0 +1,71 @@
+name: Daily Weather Prediction
+
+on:
+  schedule:
+    # 11:00 UTC = 08:00 America/Santiago (UTC-3 invierno)
+    # Ajustar a "0 12 * * *" en verano (UTC-4, oct-mar)
+    - cron: "0 11 * * *"
+
+  # Permite triggerear manualmente desde GitHub Actions UI
+  workflow_dispatch:
+
+jobs:
+  run-daily-flow:
+    name: Run Daily Prediction Flow
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Wake up Render service
+        # El servicio puede estar dormido — primer ping para despertarlo
+        run: |
+          echo "Despertando servicio..."
+          curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 60 \
+            ${{ secrets.RENDER_API_URL }}/health || true
+          sleep 5
+
+      - name: Trigger daily flow
+        run: |
+          echo "Triggereando daily_flow..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            --max-time 120 \
+            ${{ secrets.RENDER_API_URL }}/flows/daily)
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Error triggereando daily_flow (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+
+          echo "✅ daily_flow iniciado correctamente"
+
+      - name: Verify prediction was saved
+        # Esperar 30s y verificar que la predicción existe
+        run: |
+          sleep 30
+          TOMORROW=$(date -d "+1 day" +%Y-%m-%d)
+          echo "Verificando predicción para $TOMORROW..."
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            --max-time 30 \
+            ${{ secrets.RENDER_API_URL }}/predict/today)
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Predicción: $BODY"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "⚠️ No se pudo verificar la predicción (el flow puede seguir corriendo en background)"
+          else
+            echo "✅ Predicción disponible"
+          fi

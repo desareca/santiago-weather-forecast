@@ -1,0 +1,68 @@
+name: Monthly Model Evaluation
+
+on:
+  schedule:
+    # Día 1 de cada mes a las 09:00 UTC = 06:00 America/Santiago
+    - cron: "0 9 1 * *"
+
+  # Permite triggerear manualmente desde GitHub Actions UI
+  workflow_dispatch:
+
+jobs:
+  run-monthly-flow:
+    name: Run Monthly Evaluation Flow
+    runs-on: ubuntu-latest
+    timeout-minutes: 30    # el reentrenamiento puede tardar
+
+    steps:
+      - name: Wake up Render service
+        run: |
+          echo "Despertando servicio..."
+          curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 60 \
+            ${{ secrets.RENDER_API_URL }}/health || true
+          sleep 5
+
+      - name: Trigger monthly flow
+        run: |
+          echo "Triggereando monthly_flow..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            --max-time 60 \
+            ${{ secrets.RENDER_API_URL }}/flows/monthly)
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Error triggereando monthly_flow (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+
+          echo "✅ monthly_flow iniciado en background"
+          echo "El reentrenamiento puede tardar varios minutos."
+          echo "Revisar logs en Render dashboard para seguimiento."
+
+      - name: Check model info after flow
+        # Esperar 5 minutos y verificar si el modelo fue actualizado
+        run: |
+          echo "Esperando 5 minutos antes de verificar..."
+          sleep 300
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            --max-time 30 \
+            ${{ secrets.RENDER_API_URL }}/model-info)
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Model info: $BODY"
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Servicio respondiendo correctamente post-evaluación"
+          fi
