@@ -8,7 +8,13 @@ Predice: P(llueve) > threshold → reg.predict(X) | 0
 
 import numpy as np
 import pandas as pd
-import mlflow
+
+try:
+    import mlflow
+    MLFLOW_AVAILABLE = True
+except ImportError:
+    MLFLOW_AVAILABLE = False
+
 import lightgbm as lgb
 from typing import Dict, Any, Optional
 
@@ -118,7 +124,7 @@ class TwoStagePredictor:
               f"({'log1p' if self.log_target else 'lineal'})")
 
         # Log MLflow si hay run activo
-        if mlflow.active_run():
+        if MLFLOW_AVAILABLE and mlflow.active_run():
             mlflow.log_param("threshold",      self.threshold)
             mlflow.log_param("log_target",     self.log_target)
             mlflow.log_param("clf_rain_threshold", self.clf_rain_threshold)
