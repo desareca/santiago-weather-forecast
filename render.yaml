@@ -6,83 +6,53 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: free
-
-    # Variables de entorno — setear los valores en el dashboard de Render
-    # https://dashboard.render.com → tu servicio → Environment
     envVars:
       - key: HF_REPO_ID
-        sync: false          # valor sensible — setear manualmente en Render dashboard
-
+        sync: false
       - key: HF_TOKEN
-        sync: false          # token HF con permisos de lectura (y escritura para reentrenar)
-
+        sync: false
       - key: DB_PATH
         value: /tmp/santiago_weather.db
-
       - key: MODEL_CACHE_DIR
         value: /tmp/model_cache
-
       - key: PYTHONPATH
         value: /app
-
-    # Health check — Render reinicia el servicio si falla
     healthCheckPath: /health
-
-    # Render free tier: el servicio duerme tras 15min de inactividad
-    # El primer request después del sleep tarda ~30s en despertar
-
 
   # ── Cron Job — Daily Flow (08:00 Santiago = 11:00 UTC) ───────────
   - type: cron
     name: santiago-weather-daily
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: free
-    schedule: "0 11 * * *"    # 11:00 UTC = 08:00 America/Santiago (UTC-3)
-                               # Ajustar a "0 12 * * *" en horario de verano (UTC-4)
-
+    schedule: "0 11 * * *"
     envVars:
       - key: HF_REPO_ID
         sync: false
-
       - key: HF_TOKEN
         sync: false
-
       - key: DB_PATH
         value: /tmp/santiago_weather.db
-
       - key: MODEL_CACHE_DIR
         value: /tmp/model_cache
-
       - key: PYTHONPATH
         value: /app
-
-    # Comando que corre el cron job
     dockerCommand: python -c "from src.flows.daily_flow import daily_flow; import json; print(json.dumps(daily_flow()))"
-
 
   # ── Cron Job — Monthly Flow (día 1 de cada mes, 06:00 Santiago) ──
   - type: cron
     name: santiago-weather-monthly
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: free
-    schedule: "0 9 1 * *"     # 09:00 UTC = 06:00 America/Santiago (UTC-3)
-
+    schedule: "0 9 1 * *"
     envVars:
       - key: HF_REPO_ID
         sync: false
-
       - key: HF_TOKEN
         sync: false
-
       - key: DB_PATH
         value: /tmp/santiago_weather.db
-
       - key: MODEL_CACHE_DIR
         value: /tmp/model_cache
-
       - key: PYTHONPATH
         value: /app
-
     dockerCommand: python -c "from src.flows.monthly_flow import monthly_flow; import json; print(json.dumps(monthly_flow(), default=str))"
