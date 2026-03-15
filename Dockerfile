@@ -17,6 +17,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copiar requirements de producción primero para aprovechar cache de Docker
 COPY requirements-prod.txt .
 
+# Copiar main.py
+COPY src/api/main.py ./main.py
+
 # Instalar dependencias Python
 # --no-cache-dir reduce el tamaño de la imagen
 RUN pip install --no-cache-dir --upgrade pip && \
