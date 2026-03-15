@@ -43,7 +43,7 @@ from src.storage.database import (
     init_db, get_actuals_for_evaluation, count_actuals, log_evaluation
 )
 from src.storage.hf_model import ModelRegistry
-from daily_flow import get_registry
+from src.flows.daily_flow import get_registry
 
 logger = logging.getLogger(__name__)
 
