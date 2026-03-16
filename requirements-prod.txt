@@ -17,3 +17,6 @@ huggingface_hub==0.20.3
 
 # ── Descarga de datos ───────────────────────────────────────────────
 requests==2.31.0
+
+# ── Base de datos (Turso — SQLite en la nube) ────────────────────────
+libsql-client==0.3.1
