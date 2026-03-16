@@ -24,8 +24,9 @@ import numpy as np
 from datetime import date, timedelta
 from typing import Optional
 
-from prefect import flow, task, get_run_logger
-from prefect.tasks import task_input_hash
+# from prefect import flow, task, get_run_logger
+# from prefect.tasks import task_input_hash
+import logging
 from datetime import timedelta as td
 
 from src.data.ingestion import fetch_weather_data
@@ -78,7 +79,8 @@ def fetch_data(target_date: date) -> pd.DataFrame:
         target_date: El día cuyas features queremos construir (hoy).
                      Predeciremos target_date + 1 (mañana).
     """
-    log = get_run_logger()
+    #log = get_run_logger()
+    log = logging.getLogger(__name__)
 
     # Necesitamos 60 días de contexto para lags y rolling de 30 días
     start = target_date - timedelta(days=60)
@@ -108,7 +110,8 @@ def build_features_task(df_raw: pd.DataFrame) -> pd.DataFrame:
     Aplica el pipeline completo de feature engineering.
     Retorna solo la última fila (el día más reciente) con todas sus features.
     """
-    log = get_run_logger()
+    # log = get_run_logger()
+    log = logging.getLogger(__name__)
 
     df_features = build_features(df_raw)
 
@@ -133,7 +136,9 @@ def generate_prediction(df_features: pd.DataFrame) -> dict:
         dict con fecha_prediccion, prob_rain, mm_predicted, will_rain,
         model_version, threshold_used
     """
-    log = get_run_logger()
+    # log = get_run_logger()
+    log = logging.getLogger(__name__)
+
     registry = get_registry()
 
     model    = registry.model
@@ -171,7 +176,8 @@ def generate_prediction(df_features: pd.DataFrame) -> dict:
 @task(name="save-prediction")
 def save_prediction_task(prediction: dict) -> None:
     """Persiste la predicción en SQLite."""
-    log = get_run_logger()
+    # log = get_run_logger()
+    log = logging.getLogger(__name__)
 
     save_prediction(
         fecha=date.fromisoformat(prediction["fecha_prediccion"]),
@@ -196,7 +202,8 @@ def save_actual_task(df_raw: pd.DataFrame, target_date: date) -> None:
         df_raw:      DataFrame con datos crudos descargados
         target_date: Fecha de hoy — el real de ayer es target_date - 1
     """
-    log = get_run_logger()
+    # log = get_run_logger()
+    log = logging.getLogger(__name__)
 
     yesterday = target_date - timedelta(days=1)
 
@@ -243,7 +250,9 @@ def daily_flow(target_date: Optional[date] = None) -> dict:
     if target_date is None:
         target_date = date.today()
 
-    log = get_run_logger()
+    # log = get_run_logger()
+    log = logging.getLogger(__name__)
+
     log.info(f"🚀 Iniciando daily_flow para {target_date}")
 
     # Asegurar que la DB existe

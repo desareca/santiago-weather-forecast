@@ -26,7 +26,9 @@ import pandas as pd
 from datetime import date, timedelta
 from typing import Optional, Tuple
 
-from prefect import flow, task, get_run_logger
+#from prefect import flow, task, get_run_logger
+import logging
+
 from sklearn.metrics import (
     mean_squared_error, recall_score
 )
@@ -68,7 +70,9 @@ def evaluate_recent_performance(
         Tupla (rmse, recall_lluvia, n_days_with_data)
         rmse y recall son None si no hay suficientes datos.
     """
-    log = get_run_logger()
+    # log = get_run_logger()
+    log = logging.getLogger(__name__)
+
 
     df = get_actuals_for_evaluation(period_start, period_end)
 
@@ -128,7 +132,9 @@ def check_degradation(
 
     Si recall_current es None (verano sin lluvia), solo usa el criterio de RMSE.
     """
-    log = get_run_logger()
+    # log = get_run_logger()
+    log = logging.getLogger(__name__)
+
     registry = get_registry()
 
     baseline   = registry.baseline_metrics
@@ -175,7 +181,9 @@ def fetch_full_history(end_date: date) -> pd.DataFrame:
     Descarga el historial completo desde 2016 hasta end_date.
     Usado para reentrenar el modelo con todos los datos disponibles.
     """
-    log = get_run_logger()
+    # log = get_run_logger()
+    log = logging.getLogger(__name__)
+
     log.info(f"📡 Descargando historial completo 2016-01-01 → {end_date}...")
 
     df = fetch_weather_data(
@@ -205,7 +213,9 @@ def retrain_model(df_raw: pd.DataFrame) -> Tuple[TwoStagePredictor, dict, float]
     Returns:
         Tupla (nuevo_modelo, nueva_metadata, rmse_validacion)
     """
-    log = get_run_logger()
+    # log = get_run_logger()
+    log = logging.getLogger(__name__)
+    
     registry = get_registry()
     metadata = registry.metadata
 
@@ -278,7 +288,8 @@ def upload_new_model(
     Returns:
         version del nuevo modelo si se subió, None si se rechazó
     """
-    log = get_run_logger()
+    # log = get_run_logger()
+    log = logging.getLogger(__name__)
 
     if rmse_new >= rmse_current:
         log.warning(
@@ -320,7 +331,9 @@ def monthly_flow(reference_date: Optional[date] = None) -> dict:
     if reference_date is None:
         reference_date = date.today()
 
-    log = get_run_logger()
+    # log = get_run_logger()
+    log = logging.getLogger(__name__)
+    
     log.info(f"🚀 Iniciando monthly_flow para {reference_date}")
 
     init_db()
