@@ -142,6 +142,10 @@ def daily_flow(target_date: Optional[date] = None) -> dict:
     _save_prediction(prediction)
     _save_actual(df_raw, target_date)
 
+    # Backup DB en HF Hub para persistencia entre reinicios
+    from src.storage.database import backup_db_to_hub
+    backup_db_to_hub()
+
     logger.info(f"✅ daily_flow completado")
     return prediction
 
