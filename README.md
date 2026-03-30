@@ -169,7 +169,7 @@ CLF_THRESHOLDS     = [0.2, 0.3, 0.4, 0.5]  # umbrales de probabilidad a evaluar
 F_BETA             = 2.0   # recall vale el doble que precision
 
 # MLflow
-EXPERIMENT_NAME = "/Users/carlos.saquel@gmail.com/santiago_weather_forecast"
+EXPERIMENT_NAME = "/Users/<DATABRICKS ACCOUNT>/santiago_weather_forecast"
 ```
 
 ---
