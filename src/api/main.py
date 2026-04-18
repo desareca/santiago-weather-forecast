@@ -371,7 +371,7 @@ async def dashboard_data():
 
         # Recall: días lluviosos reales detectados
         rain_days = [(p[2], p[3]) for p in paired if p[3] is True]  # (will_rain, did_rain)
-        recall = float(sum(1 for w, d in rain_days if w is True) / len(rain_days)) if rain_days else None
+        recall = float(sum(1 for w, d in rain_days if w is True) / len(rain_days)) if len(rain_days) >= 3 else None
 
         n_rain_observed = len(rain_days)
     else:
@@ -398,7 +398,7 @@ async def dashboard_data():
         "reg_name":                   meta.get("reg_name"),
         "threshold":                  registry.threshold,
         "baseline_rmse":              baseline_rmse,
-        "degradation_threshold_rmse": deg_threshold,
+        "degradation_threshold_rmse": round(baseline_rmse * (1 + deg_threshold), 3) if (baseline_rmse and deg_threshold) else None,
     }
 
     return {
