@@ -32,8 +32,9 @@ from src.utils.config import (
 )
 from src.models.two_stage_model import TwoStagePredictor
 from src.storage.database import (
-    init_db, get_actuals_for_evaluation, log_evaluation
+    init_db, get_actuals_for_evaluation, log_evaluation, backup_db_to_hub
 )
+
 from src.flows.daily_flow import get_registry
 
 logger = logging.getLogger(__name__)
@@ -289,6 +290,9 @@ def monthly_flow(reference_date: Optional[date] = None) -> dict:
         new_model_version=new_model_version,
         notes=notes,
     )
+
+    # 5. Backup DB
+    backup_db_to_hub()
 
     result = {
         "reference_date":    str(reference_date),
