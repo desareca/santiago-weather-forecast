@@ -2,7 +2,7 @@
 
 Predicción diaria de precipitación para Santiago de Chile usando un modelo Two-Stage (LightGBM), con ingesta automatizada desde Open-Meteo, API REST en Render y orquestación via GitHub Actions.
 
-**API en producción:** `https://santiago-weather-api.onrender.com`
+**API + Dashboard en producción:** `https://santiago-weather-api.onrender.com`
 
 ---
 
@@ -60,13 +60,16 @@ GitHub Actions (scheduler — automático)
 
 Render Free Tier (producción)
     └── Web Service — FastAPI
+         ├── GET  /                    ← dashboard de monitoreo
          ├── GET  /health
          ├── GET  /predict/today
          ├── GET  /predict/{fecha}
          ├── GET  /history
          ├── GET  /model-info
-         ├── POST /flows/daily    ← daily_flow()
-         └── POST /flows/monthly  ← monthly_flow()
+         ├── GET  /api/dashboard-data  ← datos para el dashboard
+         ├── GET  /api/retraining-log  ← historial de evaluaciones
+         ├── POST /flows/daily         ← daily_flow()
+         └── POST /flows/monthly       ← monthly_flow()
 
 Hugging Face Hub (storage)
     ├── two_stage_model.pkl   — modelo serializado
@@ -88,6 +91,21 @@ Hugging Face Hub (storage)
 3. Si hay degradación → reentrenar con historial completo (2016→hoy)
 4. Si el nuevo modelo mejora → sube a HF Hub y actualiza en memoria
 5. Registra resultado en `retraining_log`
+6. Sube backup de la DB a HF Hub
+
+---
+
+## 📊 Dashboard de Monitoreo
+
+Disponible en la raíz de la API: `https://santiago-weather-api.onrender.com`
+
+El dashboard se actualiza automáticamente con cada ejecución del `daily_flow` y muestra:
+
+- **Predicted vs Observed** — últimos 30 días de predicciones comparadas con precipitación real, con banda de probabilidad de lluvia
+- **Daily Error** — error absoluto `|predicho − real|` de los últimos 7 días, con código de color por magnitud (verde < 2mm, amarillo 2-5mm, rojo > 5mm)
+- **Model Monitoring** — RMSE mensual evaluado vs umbral de degradación, con marcado de eventos de reentrenamiento
+
+Las métricas MAE, RMSE y Rain Recall se calculan sobre los días con observación real disponible en el período activo.
 
 ---
 
@@ -98,7 +116,8 @@ santiago-weather-forecast/
 │
 ├── src/
 │   ├── api/
-│   │   └── main.py               # FastAPI — endpoints REST
+│   │   ├── main.py               # FastAPI — endpoints REST + dashboard
+│   │   └── dashboard.html        # Dashboard de monitoreo (servido en GET /)
 │   │
 │   ├── data/
 │   │   ├── ingestion.py          # Descarga Open-Meteo API
@@ -190,7 +209,7 @@ Fold 5: [2016–2022] → test 2023
 
 ---
 
-## 📊 Resultados
+## 📈 Resultados
 
 ### Comparativa de modelos (test set holdout 2024–2025)
 
@@ -227,7 +246,7 @@ Fold 5: [2016–2022] → test 2023
 | Model registry | Hugging Face Hub |
 | Datos históricos | Open-Meteo Archive API |
 | Orquestación | GitHub Actions (cron) |
-| API | FastAPI + Uvicorn |
+| API + Dashboard | FastAPI + Uvicorn |
 | Deploy | Render (free tier) |
 | Base de datos | SQLite + backup en HF Hub |
 | Lenguaje | Python 3.11 |
@@ -247,7 +266,7 @@ Fold 5: [2016–2022] → test 2023
 - [x] Flow diario automatizado (GitHub Actions → Render)
 - [x] Evaluación mensual y reentrenamiento condicional
 - [x] Persistencia de DB con backup en HF Hub
-- [ ] Dashboard de monitoreo de métricas
+- [x] Dashboard de monitoreo (predicted vs observed, error diario, model monitoring)
 
 ---
 
@@ -259,11 +278,14 @@ Base URL: `https://santiago-weather-api.onrender.com`
 
 | Endpoint | Método | Descripción |
 |----------|--------|-------------|
+| `/` | GET | Dashboard de monitoreo |
 | `/health` | GET | Estado del servicio y modelo |
 | `/predict/today` | GET | Predicción para mañana |
 | `/predict/{fecha}` | GET | Predicción guardada para una fecha (YYYY-MM-DD) |
 | `/history?n=30` | GET | Últimas N predicciones |
 | `/model-info` | GET | Versión, parámetros y métricas baseline del modelo |
+| `/api/dashboard-data` | GET | Serie temporal + métricas para el dashboard |
+| `/api/retraining-log` | GET | Historial de evaluaciones mensuales |
 | `/flows/daily` | POST | Triggerear daily_flow manualmente |
 | `/flows/monthly` | POST | Triggerear monthly_flow manualmente |
 | `/docs` | GET | Documentación interactiva (Swagger UI) |
@@ -292,3 +314,5 @@ degradation_thresholds = {
 ```
 
 Si **ambas** condiciones se cumplen simultáneamente, el sistema reentrenar automáticamente con el historial completo (2016→fecha actual) usando los mismos hiperparámetros del modelo actual, y sube el nuevo modelo a HF Hub si mejora las métricas.
+
+El resultado de cada evaluación mensual queda registrado en la tabla `retraining_log` de SQLite y es visible en el gráfico **Model Monitoring** del dashboard.
