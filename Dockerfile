@@ -28,6 +28,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copiar el código fuente
 COPY src/ ./src/
 COPY src/api/main.py ./main.py
+COPY src/api/dashboard.html ./dashboard.html
 
 # Crear directorio para la DB y el cache del modelo
 RUN mkdir -p /tmp/model_cache /tmp/santiago_weather
