@@ -24,9 +24,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 
+from fastapi.responses import HTMLResponse
+from pathlib import Path
+import numpy as np
 from src.storage.database import (
-    init_db, get_prediction, get_recent_predictions, get_db_stats
+    init_db, get_prediction, get_recent_predictions,
+    get_db_stats, get_actuals_for_evaluation,   # ← nuevo
+    get_retraining_history,                      # ← nuevo
 )
+
 from src.storage.hf_model import ModelRegistry
 from src.flows.daily_flow import daily_flow, get_registry
 
@@ -301,6 +307,135 @@ async def trigger_monthly_flow(background_tasks: BackgroundTasks):
         message="monthly_flow iniciado en background. Puede tardar varios minutos si reentrenar.",
     )
 
+
+@app.get("/", response_class=HTMLResponse, tags=["Dashboard"], include_in_schema=False)
+async def dashboard():
+    """Sirve el dashboard HTML del proyecto."""
+    html_path = Path(__file__).parent / "dashboard.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="dashboard.html not found")
+    return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
+
+
+@app.get("/api/dashboard-data", tags=["Dashboard"])
+async def dashboard_data():
+    """
+    Retorna todos los datos necesarios para el dashboard en una sola llamada.
+
+    Incluye:
+    - model: info del modelo activo
+    - series: últimos 30 días con predicted + observed + error
+    - metrics: MAE, RMSE, recall calculados sobre los días con observación real
+    """
+    registry = get_registry()
+    meta     = registry.metadata or {}
+
+    # Período: últimos 30 días con datos
+    end_date   = date.today() - timedelta(days=1)   # ayer (último con observed)
+    start_date = end_date - timedelta(days=29)       # 30 días
+
+    df = get_actuals_for_evaluation(start_date, end_date)
+
+    # ── Series ────────────────────────────────────────────────────────────────
+    series = []
+    for _, row in df.iterrows():
+        pred = row.get("mm_predicted")
+        obs  = row.get("mm_actual")
+        err  = abs(float(pred) - float(obs)) if (pred is not None and obs is not None) else None
+
+        series.append({
+            "fecha":      row["fecha"],
+            "predicted":  round(float(pred), 3) if pred is not None else None,
+            "observed":   round(float(obs),  3) if obs  is not None else None,
+            "prob_rain":  round(float(row["prob_rain"]), 4) if row.get("prob_rain") is not None else None,
+            "will_rain":  bool(row["will_rain"]) if row.get("will_rain") is not None else None,
+            "did_rain":   bool(row["did_rain"])  if row.get("did_rain")  is not None else None,
+            "error":      round(err, 3) if err is not None else None,
+            "model_version": row.get("model_version"),
+        })
+
+    # Ordenar por fecha ascendente para los gráficos
+    series.sort(key=lambda x: x["fecha"])
+
+    # ── Métricas (solo días con ambos valores) ────────────────────────────────
+    paired = [(s["predicted"], s["observed"], s["will_rain"], s["did_rain"])
+              for s in series if s["predicted"] is not None and s["observed"] is not None]
+
+    if paired:
+        preds   = np.array([p[0] for p in paired])
+        obs_arr = np.array([p[1] for p in paired])
+        errors  = np.abs(preds - obs_arr)
+
+        mae  = float(np.mean(errors))
+        rmse = float(np.sqrt(np.mean(errors ** 2)))
+
+        # Recall: días lluviosos reales detectados
+        rain_days = [(p[2], p[3]) for p in paired if p[3] is True]  # (will_rain, did_rain)
+        recall = float(sum(1 for w, d in rain_days if w is True) / len(rain_days)) if rain_days else None
+
+        n_rain_observed = len(rain_days)
+    else:
+        mae = rmse = recall = None
+        n_rain_observed = 0
+
+    baseline_rmse = registry.baseline_metrics.get("rmse") if registry.baseline_metrics else None
+    deg_threshold = registry.degradation_thresholds.get("rmse_max_pct_increase") if registry.degradation_thresholds else None
+
+    metrics = {
+        "mae":               round(mae,  3) if mae  is not None else None,
+        "rmse":              round(rmse, 3) if rmse is not None else None,
+        "recall":            round(recall, 3) if recall is not None else None,
+        "n_days":            len(paired),
+        "n_rain_days_observed": n_rain_observed,
+        "rmse_baseline":     baseline_rmse,
+    }
+
+    # ── Model info ────────────────────────────────────────────────────────────
+    model_info = {
+        "version":                    registry.version,
+        "train_end":                  meta.get("train_end"),
+        "clf_name":                   meta.get("clf_name"),
+        "reg_name":                   meta.get("reg_name"),
+        "threshold":                  registry.threshold,
+        "baseline_rmse":              baseline_rmse,
+        "degradation_threshold_rmse": deg_threshold,
+    }
+
+    return {
+        "model":   model_info,
+        "series":  series,
+        "metrics": metrics,
+    }
+
+
+@app.get("/api/retraining-log", tags=["Dashboard"])
+async def retraining_log():
+    """
+    Historial de evaluaciones mensuales y eventos de reentrenamiento.
+    Usado por el gráfico de Model Monitoring del dashboard.
+    """
+    df = get_retraining_history()
+    if df.empty:
+        return []
+
+    records = []
+    for _, row in df.iterrows():
+        records.append({
+            "evaluated_at":      row.get("evaluated_at"),
+            "period_start":      row.get("period_start"),
+            "period_end":        row.get("period_end"),
+            "n_days":            int(row["n_days"]) if row.get("n_days") is not None else None,
+            "rmse_current":      round(float(row["rmse_current"]), 4) if row.get("rmse_current") is not None else None,
+            "recall_current":    round(float(row["recall_current"]), 4) if row.get("recall_current") is not None else None,
+            "rmse_baseline":     round(float(row["rmse_baseline"]), 4) if row.get("rmse_baseline") is not None else None,
+            "recall_baseline":   round(float(row["recall_baseline"]), 4) if row.get("recall_baseline") is not None else None,
+            "degraded":          bool(row["degraded"]),
+            "retrained":         bool(row["retrained"]),
+            "new_model_version": row.get("new_model_version"),
+            "notes":             row.get("notes"),
+        })
+
+    return records
 
 # ──────────────────────────────────────────────────────────────────────────────
 # ENTRYPOINT LOCAL

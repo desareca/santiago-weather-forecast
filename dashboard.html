@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Santiago Weather Forecast</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:         #f5f4f0;
+    --surface:    #ffffff;
+    --surface-2:  #efede8;
+    --border:     #dddbd4;
+    --text-1:     #1a1916;
+    --text-2:     #6b6a65;
+    --text-3:     #9d9c97;
+    --accent:     #1d4ed8;
+    --accent-dim: #dbeafe;
+    --rain:       #0ea5e9;
+    --rain-dim:   #e0f2fe;
+    --obs:        #64748b;
+    --ok:         #16a34a;
+    --warn:       #d97706;
+    --danger:     #dc2626;
+    --mono:       'DM Mono', monospace;
+    --sans:       'DM Sans', sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:         #111110;
+      --surface:    #1c1c1a;
+      --surface-2:  #242422;
+      --border:     #2e2e2b;
+      --text-1:     #e8e6e0;
+      --text-2:     #8a8880;
+      --text-3:     #55534e;
+      --accent:     #60a5fa;
+      --accent-dim: #1e3a5f;
+      --rain:       #38bdf8;
+      --rain-dim:   #0c2d3f;
+      --obs:        #94a3b8;
+      --ok:         #4ade80;
+      --warn:       #fbbf24;
+      --danger:     #f87171;
+    }
+  }
+
+  html { font-size: 15px; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text-1);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 1.5rem 2rem;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    background: var(--surface);
+  }
+
+  .header-left h1 {
+    font-family: var(--mono);
+    font-size: 1.05rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--text-1);
+  }
+
+  .header-left p {
+    font-size: 0.8rem;
+    color: var(--text-3);
+    margin-top: 2px;
+    font-family: var(--mono);
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .model-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.35rem 0.75rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text-2);
+  }
+
+  .model-badge span.label { color: var(--text-3); }
+  .model-badge span.value { color: var(--text-1); font-weight: 500; }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--ok);
+    flex-shrink: 0;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  /* ── METRIC CARDS ── */
+  .metrics-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .metric-card .label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .metric-card .value {
+    font-family: var(--mono);
+    font-size: 2rem;
+    font-weight: 400;
+    color: var(--text-1);
+    line-height: 1.1;
+  }
+
+  .metric-card .sub {
+    font-size: 0.72rem;
+    color: var(--text-3);
+    margin-top: 0.1rem;
+  }
+
+  .metric-card .value.good { color: var(--ok); }
+  .metric-card .value.warn { color: var(--warn); }
+  .metric-card .value.bad  { color: var(--danger); }
+
+  /* ── CHART PANELS ── */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+  }
+
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.25rem;
+  }
+
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-2);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .panel-sub {
+    font-size: 0.72rem;
+    color: var(--text-3);
+    margin-top: 2px;
+    font-family: var(--mono);
+  }
+
+  .legend {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+    color: var(--text-3);
+    font-family: var(--mono);
+  }
+
+  .legend-line {
+    width: 20px; height: 2px;
+    border-radius: 1px;
+  }
+
+  .legend-area {
+    width: 14px; height: 8px;
+    border-radius: 2px;
+    opacity: 0.4;
+  }
+
+  .charts-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 1.25rem 2rem;
+    background: var(--surface);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  footer p {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--text-3);
+  }
+
+  footer a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  /* ── LOADING / ERROR ── */
+  .state-overlay {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 3rem;
+    color: var(--text-3);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+  }
+
+  .spinner {
+    width: 20px; height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .no-data {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-3);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 700px) {
+    main { padding: 1rem; }
+    header { padding: 1rem; }
+    .metrics-row { grid-template-columns: 1fr; }
+    .charts-row  { grid-template-columns: 1fr; }
+    .metric-card .value { font-size: 1.6rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>Santiago Weather Forecast</h1>
+    <p>Daily precipitation prediction · Quinta Normal, Santiago de Chile</p>
+  </div>
+  <div class="header-right">
+    <div class="model-badge">
+      <div class="status-dot"></div>
+      <span class="label">model</span>
+      <span class="value" id="hdr-model">—</span>
+    </div>
+    <div class="model-badge">
+      <span class="label">trained through</span>
+      <span class="value" id="hdr-train-end">—</span>
+    </div>
+    <div class="model-badge">
+      <span class="label">n days</span>
+      <span class="value" id="hdr-ndays">—</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- METRIC CARDS -->
+  <div class="metrics-row">
+    <div class="metric-card">
+      <span class="label">MAE</span>
+      <span class="value" id="m-mae">—</span>
+      <span class="sub">mean absolute error (mm)</span>
+    </div>
+    <div class="metric-card">
+      <span class="label">RMSE</span>
+      <span class="value" id="m-rmse">—</span>
+      <span class="sub">root mean squared error (mm)</span>
+    </div>
+    <div class="metric-card">
+      <span class="label">Rain recall</span>
+      <span class="value" id="m-recall">—</span>
+      <span class="sub">rainy days correctly detected</span>
+    </div>
+  </div>
+
+  <!-- CHART 1: Predicted vs Observed -->
+  <div class="panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Predicted vs Observed</div>
+        <div class="panel-sub">Last 30 days · mm precipitation</div>
+      </div>
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-line" style="background: var(--rain);"></div>
+          Predicted
+        </div>
+        <div class="legend-item">
+          <div class="legend-line" style="background: var(--obs); border-top: 2px dashed var(--obs); height:0;"></div>
+          Observed
+        </div>
+        <div class="legend-item">
+          <div class="legend-area" style="background: var(--rain);"></div>
+          Rain probability
+        </div>
+      </div>
+    </div>
+    <div class="chart-wrap" style="height: 280px;">
+      <canvas id="chart-main" role="img" aria-label="Line chart comparing predicted and observed daily precipitation over the last 30 days"></canvas>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW: Error + Monitoring -->
+  <div class="charts-row">
+
+    <!-- CHART 2: Daily error -->
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Daily Error</div>
+          <div class="panel-sub">|predicted − observed| · last 7 days</div>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height: 200px;">
+        <canvas id="chart-error" role="img" aria-label="Bar chart of daily absolute prediction error for the last 7 days"></canvas>
+      </div>
+    </div>
+
+    <!-- CHART 3: Model monitoring -->
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Model Monitoring</div>
+          <div class="panel-sub">Monthly RMSE vs degradation threshold</div>
+        </div>
+        <div class="legend">
+          <div class="legend-item">
+            <div class="legend-line" style="background: var(--accent);"></div>
+            RMSE
+          </div>
+          <div class="legend-item">
+            <div class="legend-line" style="background: var(--danger); border-top: 2px dashed var(--danger); height:0;"></div>
+            Threshold
+          </div>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height: 200px;">
+        <canvas id="chart-monitor" role="img" aria-label="Line chart showing monthly RMSE compared to the degradation threshold"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<footer>
+  <p>Updated daily via GitHub Actions · Two-Stage LightGBM (classifier + regressor) · Open-Meteo data</p>
+  <p>Last updated: <span id="footer-date">—</span></p>
+</footer>
+
+<script>
+// ── THEME COLORS (resolved at runtime) ──────────────────────────────────────
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+// ── FETCH DATA ───────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const [dataRes, retRes] = await Promise.all([
+      fetch('/api/dashboard-data'),
+      fetch('/api/retraining-log'),
+    ]);
+
+    if (!dataRes.ok) throw new Error('Failed to load dashboard data');
+    const data = await dataRes.json();
+    const retraining = retRes.ok ? await retRes.json() : [];
+
+    renderHeader(data.model, data.metrics);
+    renderMetrics(data.metrics);
+    renderMainChart(data.series);
+    renderErrorChart(data.series);
+    renderMonitorChart(retraining, data.model.baseline_rmse, data.model.degradation_threshold_rmse);
+    document.getElementById('footer-date').textContent = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  } catch (err) {
+    console.error(err);
+    document.querySelector('main').innerHTML = `<div class="state-overlay"><p>Could not load data. Is the API running?</p><p style="color:var(--text-3);font-size:0.65rem;">${err.message}</p></div>`;
+  }
+}
+
+// ── HEADER ───────────────────────────────────────────────────────────────────
+function renderHeader(model, metrics) {
+  document.getElementById('hdr-model').textContent    = model.version || '—';
+  document.getElementById('hdr-train-end').textContent = model.train_end || '—';
+  document.getElementById('hdr-ndays').textContent     = metrics.n_days ?? '—';
+}
+
+// ── METRICS ──────────────────────────────────────────────────────────────────
+function renderMetrics(metrics) {
+  const mae    = metrics.mae;
+  const rmse   = metrics.rmse;
+  const recall = metrics.recall;
+
+  const maeEl    = document.getElementById('m-mae');
+  const rmseEl   = document.getElementById('m-rmse');
+  const recallEl = document.getElementById('m-recall');
+
+  maeEl.textContent  = mae   != null ? mae.toFixed(2)  : '—';
+  rmseEl.textContent = rmse  != null ? rmse.toFixed(2) : '—';
+  recallEl.textContent = recall != null ? (recall * 100).toFixed(0) + '%' : '—';
+
+  // Color coding RMSE vs baseline
+  if (rmse != null && metrics.rmse_baseline != null) {
+    const pct = (rmse - metrics.rmse_baseline) / metrics.rmse_baseline;
+    rmseEl.className = 'value ' + (pct < 0.1 ? 'good' : pct < 0.2 ? 'warn' : 'bad');
+  }
+  if (recall != null) {
+    recallEl.className = 'value ' + (recall >= 0.6 ? 'good' : recall >= 0.5 ? 'warn' : 'bad');
+  }
+}
+
+// ── CHART 1: Predicted vs Observed ───────────────────────────────────────────
+function renderMainChart(series) {
+  const ctx = document.getElementById('chart-main').getContext('2d');
+
+  if (!series || series.length === 0) {
+    ctx.canvas.parentElement.innerHTML = '<div class="no-data">No data available yet.</div>';
+    return;
+  }
+
+  const labels    = series.map(d => d.fecha.slice(5));  // MM-DD
+  const predicted = series.map(d => d.predicted != null ? +d.predicted.toFixed(2) : null);
+  const observed  = series.map(d => d.observed  != null ? +d.observed.toFixed(2)  : null);
+  const probArea  = series.map(d => d.prob_rain  != null ? +(d.prob_rain * 12).toFixed(2) : null);
+
+  const rainColor   = '#0ea5e9';
+  const obsColor    = '#64748b';
+  const probColor   = '#0ea5e9';
+
+  new Chart(ctx, {
+    data: {
+      labels,
+      datasets: [
+        {
+          type: 'line',
+          label: 'Predicted',
+          data: predicted,
+          borderColor: rainColor,
+          borderWidth: 1.5,
+          pointRadius: 3,
+          pointBackgroundColor: rainColor,
+          tension: 0.3,
+          yAxisID: 'y',
+          order: 1,
+        },
+        {
+          type: 'line',
+          label: 'Observed',
+          data: observed,
+          borderColor: obsColor,
+          borderWidth: 1.5,
+          borderDash: [4, 3],
+          pointRadius: 3,
+          pointBackgroundColor: obsColor,
+          tension: 0.3,
+          yAxisID: 'y',
+          order: 2,
+        },
+        {
+          type: 'bar',
+          label: 'Rain probability',
+          data: probArea,
+          backgroundColor: probColor + '22',
+          borderColor: probColor + '44',
+          borderWidth: 1,
+          yAxisID: 'y',
+          order: 3,
+          barPercentage: 0.95,
+          categoryPercentage: 1.0,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              if (ctx.dataset.label === 'Rain probability') {
+                const raw = ctx.parsed.y / 12;
+                return `Rain prob: ${(raw * 100).toFixed(1)}%`;
+              }
+              return `${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toFixed(2) + ' mm' : '—'}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { font: { family: "'DM Mono', monospace", size: 10 }, color: '#9d9c97', maxRotation: 45, autoSkip: true, maxTicksLimit: 15 },
+          grid: { color: 'rgba(128,128,128,0.08)' },
+        },
+        y: {
+          min: 0,
+          ticks: { font: { family: "'DM Mono', monospace", size: 10 }, color: '#9d9c97', callback: v => v + ' mm' },
+          grid: { color: 'rgba(128,128,128,0.08)' },
+        },
+      },
+    },
+  });
+}
+
+// ── CHART 2: Daily Error (last 7 days) ───────────────────────────────────────
+function renderErrorChart(series) {
+  const ctx = document.getElementById('chart-error').getContext('2d');
+
+  const withError = series.filter(d => d.error != null).slice(-7);
+
+  if (withError.length === 0) {
+    ctx.canvas.parentElement.innerHTML = '<div class="no-data">Not enough data yet.</div>';
+    return;
+  }
+
+  const labels = withError.map(d => d.fecha.slice(5));
+  const errors = withError.map(d => +d.error.toFixed(2));
+
+  const barColors = errors.map(e =>
+    e < 2   ? '#16a34a' :
+    e < 5   ? '#d97706' : '#dc2626'
+  );
+
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Absolute error',
+        data: errors,
+        backgroundColor: barColors,
+        borderRadius: 3,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => `Error: ${ctx.parsed.y.toFixed(2)} mm`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { font: { family: "'DM Mono', monospace", size: 10 }, color: '#9d9c97' },
+          grid: { display: false },
+        },
+        y: {
+          min: 0,
+          ticks: { font: { family: "'DM Mono', monospace", size: 10 }, color: '#9d9c97', callback: v => v + ' mm' },
+          grid: { color: 'rgba(128,128,128,0.08)' },
+        },
+      },
+    },
+  });
+}
+
+// ── CHART 3: Model Monitoring ─────────────────────────────────────────────────
+function renderMonitorChart(retraining, baselineRmse, thresholdPct) {
+  const ctx = document.getElementById('chart-monitor').getContext('2d');
+
+  const threshold = baselineRmse != null && thresholdPct != null
+    ? baselineRmse * (1 + thresholdPct)
+    : null;
+
+  if (!retraining || retraining.length === 0) {
+    ctx.canvas.parentElement.innerHTML = '<div class="no-data">No monthly evaluations yet.</div>';
+    return;
+  }
+
+  const sorted  = [...retraining].sort((a, b) => a.evaluated_at.localeCompare(b.evaluated_at));
+  const labels  = sorted.map(d => d.evaluated_at.slice(0, 10));
+  const rmses   = sorted.map(d => d.rmse_current != null ? +d.rmse_current.toFixed(3) : null);
+  const pointColors = sorted.map(d => d.degraded ? '#dc2626' : '#1d4ed8');
+
+  const datasets = [
+    {
+      label: 'RMSE (monthly eval)',
+      data: rmses,
+      borderColor: '#1d4ed8',
+      borderWidth: 1.5,
+      pointBackgroundColor: pointColors,
+      pointRadius: 5,
+      tension: 0.2,
+    }
+  ];
+
+  if (threshold != null) {
+    datasets.push({
+      label: 'Degradation threshold',
+      data: labels.map(() => +threshold.toFixed(3)),
+      borderColor: '#dc2626',
+      borderWidth: 1,
+      borderDash: [4, 3],
+      pointRadius: 0,
+      tension: 0,
+    });
+  }
+
+  new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              if (ctx.dataset.label.includes('threshold')) return `Threshold: ${ctx.parsed.y.toFixed(2)} mm`;
+              const row = sorted[ctx.dataIndex];
+              return [
+                `RMSE: ${ctx.parsed.y.toFixed(2)} mm`,
+                `Retrained: ${row.retrained ? 'yes' : 'no'}`,
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { font: { family: "'DM Mono', monospace", size: 10 }, color: '#9d9c97' },
+          grid: { color: 'rgba(128,128,128,0.08)' },
+        },
+        y: {
+          ticks: { font: { family: "'DM Mono', monospace", size: 10 }, color: '#9d9c97', callback: v => v.toFixed(1) },
+          grid: { color: 'rgba(128,128,128,0.08)' },
+        },
+      },
+    },
+  });
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+loadDashboard();
+</script>
+</body>
+</html>
