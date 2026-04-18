@@ -637,12 +637,10 @@ function renderErrorChart(series) {
 }
 
 // ── CHART 3: Model Monitoring ─────────────────────────────────────────────────
-function renderMonitorChart(retraining, baselineRmse, thresholdPct) {
+function renderMonitorChart(retraining, baselineRmse, thresholdAbs) {
   const ctx = document.getElementById('chart-monitor').getContext('2d');
 
-  const threshold = baselineRmse != null && thresholdPct != null
-    ? baselineRmse * (1 + thresholdPct)
-    : null;
+  const threshold = thresholdAbs;
 
   if (!retraining || retraining.length === 0) {
     ctx.canvas.parentElement.innerHTML = '<div class="no-data">No monthly evaluations yet.</div>';
@@ -650,32 +648,45 @@ function renderMonitorChart(retraining, baselineRmse, thresholdPct) {
   }
 
   const sorted  = [...retraining].sort((a, b) => a.evaluated_at.localeCompare(b.evaluated_at));
-  const labels  = sorted.map(d => d.evaluated_at.slice(0, 10));
-  const rmses   = sorted.map(d => d.rmse_current != null ? +d.rmse_current.toFixed(3) : null);
-  const pointColors = sorted.map(d => d.degraded ? '#dc2626' : '#1d4ed8');
+
+  // Con un solo punto, agregamos un label vacío antes para que la línea se extienda
+  const dataLabels = sorted.length === 1
+    ? ['', sorted[0].evaluated_at.slice(0, 10)]
+    : sorted.map(d => d.evaluated_at.slice(0, 10));
+
+  const rmseData = sorted.length === 1
+    ? [null, sorted[0].rmse_current != null ? +sorted[0].rmse_current.toFixed(3) : null]
+    : sorted.map(d => d.rmse_current != null ? +d.rmse_current.toFixed(3) : null);
+
+  const pointColors = sorted.length === 1
+    ? ['transparent', sorted[0].degraded ? '#dc2626' : '#1d4ed8']
+    : sorted.map(d => d.degraded ? '#dc2626' : '#1d4ed8');
+
+  const pointRadii = sorted.length === 1 ? [0, 5] : sorted.map(() => 5);
+
+  const thresholdData = threshold != null ? dataLabels.map(() => +threshold.toFixed(3)) : [];
+
+  const yMax = threshold != null ? threshold * 1.25 : undefined;
 
   const datasets = [
     {
-      label: 'RMSE (monthly eval)',
-      data: rmses,
+      label: 'RMSE',
+      data: rmseData,
       borderColor: '#1d4ed8',
       borderWidth: 1.5,
       pointBackgroundColor: pointColors,
-      pointRadius: 5,
+      pointRadius: pointRadii,
       tension: 0.2,
+      spanGaps: false,
     }
   ];
 
   if (threshold != null) {
-    const extendedLabels = labels.length === 1 
-      ? [labels[0] + ' ', labels[0]] 
-      : labels;
-    datasets[0].labels = extendedLabels;
     datasets.push({
-      label: 'Degradation threshold',
-      data: extendedLabels.map(() => +threshold.toFixed(3)),
+      label: 'Threshold',
+      data: thresholdData,
       borderColor: '#dc2626',
-      borderWidth: 1,
+      borderWidth: 1.5,
       borderDash: [4, 3],
       pointRadius: 0,
       tension: 0,
@@ -684,17 +695,20 @@ function renderMonitorChart(retraining, baselineRmse, thresholdPct) {
 
   new Chart(ctx, {
     type: 'line',
-    data: { labels, datasets },
+    data: { labels: dataLabels, datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
         tooltip: {
+          filter: item => item.parsed.y !== null,
           callbacks: {
             label: ctx => {
-              if (ctx.dataset.label.includes('threshold')) return `Threshold: ${ctx.parsed.y.toFixed(2)} mm`;
-              const row = sorted[ctx.dataIndex];
+              if (ctx.dataset.label === 'Threshold') return `Threshold: ${ctx.parsed.y.toFixed(2)} mm`;
+              const idx = sorted.length === 1 ? 0 : ctx.dataIndex;
+              const row = sorted[idx];
+              if (!row) return '';
               return [
                 `RMSE: ${ctx.parsed.y.toFixed(2)} mm`,
                 `Retrained: ${row.retrained ? 'yes' : 'no'}`,
@@ -709,6 +723,8 @@ function renderMonitorChart(retraining, baselineRmse, thresholdPct) {
           grid: { color: 'rgba(128,128,128,0.08)' },
         },
         y: {
+          min: 0,
+          max: yMax,
           ticks: { font: { family: "'DM Mono', monospace", size: 10 }, color: '#9d9c97', callback: v => v.toFixed(1) },
           grid: { color: 'rgba(128,128,128,0.08)' },
         },
