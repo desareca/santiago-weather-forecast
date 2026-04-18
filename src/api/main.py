@@ -311,7 +311,7 @@ async def trigger_monthly_flow(background_tasks: BackgroundTasks):
 @app.get("/", response_class=HTMLResponse, tags=["Dashboard"], include_in_schema=False)
 async def dashboard():
     """Sirve el dashboard HTML del proyecto."""
-    html_path = Path(__file__).parent / "dashboard.html"
+    html_path = Path(__file__).resolve().parent / "dashboard.html"
     if not html_path.exists():
         raise HTTPException(status_code=404, detail="dashboard.html not found")
     return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
