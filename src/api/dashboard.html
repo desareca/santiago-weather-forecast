@@ -667,9 +667,13 @@ function renderMonitorChart(retraining, baselineRmse, thresholdPct) {
   ];
 
   if (threshold != null) {
+    const extendedLabels = labels.length === 1 
+      ? [labels[0] + ' ', labels[0]] 
+      : labels;
+    datasets[0].labels = extendedLabels;
     datasets.push({
       label: 'Degradation threshold',
-      data: labels.map(() => +threshold.toFixed(3)),
+      data: extendedLabels.map(() => +threshold.toFixed(3)),
       borderColor: '#dc2626',
       borderWidth: 1,
       borderDash: [4, 3],
