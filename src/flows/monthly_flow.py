@@ -84,7 +84,8 @@ def _evaluate_recent_performance(
     else:
         recall = float(recall_score(y_true_bin, y_pred_bin, zero_division=0))
 
-    logger.info(f"RMSE: {rmse:.3f} | Recall: {recall:.3f if recall else 'N/A'}")
+    recall_str = f"{recall:.3f}" if recall is not None else "N/A"
+    logger.info(f"RMSE: {rmse:.3f} | Recall: {recall_str}")
     return rmse, recall, n_days
 
 
