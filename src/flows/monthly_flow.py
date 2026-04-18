@@ -114,6 +114,8 @@ def _check_degradation(
     logger.info(f"RMSE: {rmse_current:.3f} vs límite {rmse_limit:.3f} → {'❌' if rmse_degraded else '✅'}")
     if recall_current is not None:
         logger.info(f"Recall: {recall_current:.3f} vs mínimo {recall_min} → {'❌' if recall_degraded else '✅'}")
+    else:
+        logger.info(f"Recall: N/A (insuficientes días lluviosos)")
     logger.info(f"Decisión: {'⚠️ REENTRENAR' if degraded else '✅ no reentrenar'}")
 
     return degraded
